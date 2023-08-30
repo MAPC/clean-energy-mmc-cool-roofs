@@ -4,7 +4,7 @@ import logging
 from pathlib import Path
 #from dotenv import find_dotenv, load_dotenv
 import geopandas as gpd
-
+import pandas as pd
 
 
 
@@ -18,28 +18,18 @@ mmc_munis = ['Arlington', 'Boston', 'Braintree', 'Brookline', 'Cambridge', 'Chel
 building_structures_gdb = 'K:\\DataServices\\Datasets\\MassGIS\\Facilities_Structures\\Building_Structures\\Output\\structures.gdb'
 building_structures_layer = 'STRUCTURES_POLY'
 
-'''
-@click.command()
-@click.argument('input_filepath', type=click.Path(exists=True))
-@click.argument('output_filepath', type=click.Path())
-def main(input_filepath, output_filepath):
-    """ Runs data processing scripts to turn raw data from (../raw) into
-        cleaned data ready to be analyzed (saved in ../processed).
-    """
-    logger = logging.getLogger(__name__)
-    logger.info('making final data set from raw data')
+#lookup tables
+land_use_lookup_fp = r"K:\DataServices\Projects\Current_Projects\Climate_Change\MVP_MMC_CoolRoofs_MVP\Data\lookup_tables\land_use_lookup.csv"
+real_estate_lookup_fp = r"K:\DataServices\Projects\Current_Projects\Climate_Change\MVP_MMC_CoolRoofs_MVP\Data\lookup_tables\real_estate_type_lookup.csv"
+real_estate_lookup_codes_fp = r"K:\DataServices\Projects\Current_Projects\Climate_Change\MVP_MMC_CoolRoofs_MVP\Data\lookup_tables\real_estate_lookup.csv"
 
+land_use_lookup = pd.read_csv(land_use_lookup_fp)
+real_estate_lookup = pd.read_csv(real_estate_lookup_fp)
+real_estate_lookup_code = pd.read_csv(real_estate_lookup_codes_fp)
 
-if __name__ == '__main__':
-    log_fmt = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-    logging.basicConfig(level=logging.INFO, format=log_fmt)
+#where to export charts
+chart_fp = "K:\\DataServices\\Projects\\Current_Projects\\Climate_Change\\MVP_MMC_CoolRoofs_MVP\Charts"
 
-    # not used in this stub but often useful for finding various files
-    project_dir = Path(__file__).resolve().parents[2]
-
-    # find .env automagically by walking up directories until it's found, then
-    # load up the .env entries as environment variables
-    load_dotenv(find_dotenv())
-
-    main()
-'''
+#mapc blocks
+mapc_blocks_fp = 'K:\\DataServices\\Projects\\Current_Projects\\Environment\\MS4\\Project\\MS4_Model.gdb'
+mapc_blocks = gpd.read_file(mapc_blocks_fp, layer='mapc_2020_blocks')
