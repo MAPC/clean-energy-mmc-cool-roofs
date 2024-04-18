@@ -7,6 +7,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import textwrap
 import rasterio
+import rasterstats
 
 #set defaults for matplotlib
 plt.rcParams.update({'font.family':'Tw Cen MT'})
@@ -242,3 +243,6 @@ def public_ownership(parcel_data):
         
     parcel_dataset['par_typ'] =  parcel_dataset.apply(conditions, axis=1)
     return parcel_dataset
+
+
+
