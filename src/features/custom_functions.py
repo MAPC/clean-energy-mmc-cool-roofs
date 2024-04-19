@@ -390,11 +390,11 @@ def public_ownership(parcel_data):
 
 
 
-def parcel_process(parcel_data, structures_data):
-    #add to make_dataset = 
-    heat_fp = 'K:\\DataServices\\Projects\\Current_Projects\\Climate_Change\\MVP_MMC_Heat_MVP\\00 Task 2 Deliverables\\2.1 Attachments\\00 Uploaded to Sharepoint\\Shapefile_LSTIndex\\LSTindex.tif'
+def cool_roof_process(town_name, structures_data):
 
     '''
+    ## Rachel to fill in ## 
+    
     Analyzes the breakdown of structures located in high heat areas in a municipality of interest.
 
     INPUTS
@@ -406,48 +406,73 @@ def parcel_process(parcel_data, structures_data):
     the municipality.
 
     '''
-    #reproject all to mass mainland
-    mass_mainland_crs = "EPSG:26986"
-    parcel_data = parcel_data.to_crs(mass_mainland_crs)
-    structures_data = structures_data.to_crs(mass_mainland_crs)
+    ## BRING IN PARCEL AND STRUCTURES DATA ##
+    #repurpose 3A script to get parcels with MAPC Land Parcel Database info attached
+    muni_parcels = get_landuse_data(town_name)
 
+    #now start joining process
+    structures_data = rooftops_layer.clip(muni_parcels)
+
+    ## ADD LAND USE AND REAL ESTATE CODES ## 
 
     #reformat use code to match with real estate lookup codes
     land_use_lookup['USE_CODE'] = land_use_lookup['USE_CODE'].apply(lambda x: '{0:0>3}'.format(x))
     real_estate_lookup['use_code_3dg'] = real_estate_lookup['use_code_3dg'].str.replace('"', '') 
 
-    ## JOIN PARCELS, CODES, AND STRUCTURES ##
-
     #merge parcels with use descriptions to get use codes
-    muni_gdf = parcel_data.merge(land_use_lookup, left_on='LUC_Assign_M', right_on='USE_CODE', how='left').drop_duplicates()
-    
-    #merge real estate lookup codes based on land use codes
-    muni_gdf = muni_gdf.merge(real_estate_lookup, left_on='USE_CODE', right_on='use_code_3dg', how='left').reset_index()
-    
-    #get real estate typology descriptions based on real estate codes
-    muni_gdf = muni_gdf.merge(real_estate_lookup_code, on='real_estate_type', how='left').reset_index()
+    muni_parcels = muni_parcels.merge(land_use_lookup, left_on='LUC_Assign_M', right_on='USE_CODE', how='left').groupby(by='LOC_ID').agg('first').reset_index()
 
+    #merge real estate lookup codes based on land use codes
+    muni_parcels = muni_parcels.merge(real_estate_lookup, left_on='USE_CODE', right_on='use_code_3dg', how='left').groupby(by='LOC_ID').agg('first').reset_index()
+
+    #get real estate typology descriptions based on real estate codes
+    muni_parcels = muni_parcels.merge(real_estate_lookup_code, on='real_estate_type', how='left').groupby(by='LOC_ID').agg('first').reset_index()
+
+    ## HEAT FIELD ##
     #determine highest heat parcels based on 'rnk_heat' value. high heat in this case means being in the
     #top 20% of hottest census blocks
-    muni_gdf = heat_score (muni_gdf, heat_fp)
 
-    heat_bnry_rule = [muni_gdf['rnk_heat'] >= 0.8, 
-                      muni_gdf['rnk_heat'] < 0.8]
-    
+    mass_mainland_crs = "EPSG:26986"
+    muni_parcels = muni_parcels.set_crs(mass_mainland_crs)
+    structures_data = structures_data.to_crs(mass_mainland_crs)
+
+    muni_parcels = heat_score(muni_parcels, heat_fp)
+
+
+    heat_bnry_rule = [muni_parcels['rnk_heat'] >= 0.8, 
+                    muni_parcels['rnk_heat'] < 0.8]
+
     choices = ['in high heat area', 
-               'not in high heat area']
-    
+                'not in high heat area']
+
     #create a new field based on whether or not a parcel is in a high heat area
-    muni_gdf['heat_mmc'] = np.select(heat_bnry_rule, choices, default=np.nan)
-   
+    muni_parcels['heat_mmc'] = np.select(heat_bnry_rule, choices, default=np.nan)
+    
+    ## PUBLIC OWNERSHIP ## 
+    #field for whether or not the parcel is publicly owned
+    muni_parcels = public_ownership(muni_parcels)
+
+    ## ENVIRONMENTAL JUSTICE ## 
+    #field for whether or not the parcel is in an EJ census block group
+
+    ej_parcels = gpd.sjoin(muni_parcels, 
+                        ej_2020,
+                        how='left').groupby(
+                            by='LOC_ID').agg('first').reset_index()
+
+
+    ej_parcels['EJ'] = ej_parcels['EJ'].fillna('No')
+
+    ## JOIN STRUCTURES TO PARCELS ##
+
     #reproject all to mass mainland
     mass_mainland_crs = "EPSG:26986"
-    muni_gdf = muni_gdf.set_crs(mass_mainland_crs)
+    muni_parcels = muni_parcels.set_crs(mass_mainland_crs)
     structures_data = structures_data.to_crs(mass_mainland_crs)
 
     #spatially join structures to parcels, group by structure id to eliminate duplicates
-    muni_gdf = muni_gdf.drop(['index_right'], axis=1)
-    muni_structures_join_parcels = structures_data.sjoin(muni_gdf, how='left').groupby(by='STRUCT_ID').agg('first').reset_index()
-  
+    muni_parcels = muni_parcels.drop(['index_right'], axis=1)
+    muni_structures_join_parcels = structures_data.sjoin(muni_parcels, how='left').groupby(by='STRUCT_ID').agg('first').reset_index()
+
     return(muni_structures_join_parcels)
 

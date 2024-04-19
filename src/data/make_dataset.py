@@ -5,6 +5,7 @@ from pathlib import Path
 #from dotenv import find_dotenv, load_dotenv
 import geopandas as gpd
 import pandas as pd
+import os
 
 
 datasets_dir = r'K:\DataServices\datasets'
@@ -34,4 +35,17 @@ chart_fp = "K:\\DataServices\\Projects\\Current_Projects\\Climate_Change\\MVP_MM
 #mapc blocks
 mapc_blocks_fp = 'K:\\DataServices\\Projects\\Current_Projects\\Environment\\MS4\\Project\\MS4_Model.gdb'
 mapc_blocks = gpd.read_file(mapc_blocks_fp, layer='mapc_2020_blocks')
+
+#municipalities
+munis_fp = os.path.join(datasets_dir, "Boundaries\Spatial\mapc_towns_poly.shp")
+munis = gpd.read_file(munis_fp)
+
+#environmental justice (2020 boundaries, updated in 2023)
+datasets_dir = r'K:\DataServices\datasets'
+ej_2020_gdb = os.path.join(datasets_dir, 'Environment and Energy\Environmental_Justice\ej2020.gdb')
+ej_2020 = gpd.read_file(ej_2020_gdb, layer='EJ_POLY')
+ej_field = 'EJ_CRIT_DESC'
+
+#heat
+heat_fp = os.path.join(datasets_dir, 'Environment and Energy\Land_Surface_Temperature\Shapefile_LSTIndex\LSTindex.tif')
 
