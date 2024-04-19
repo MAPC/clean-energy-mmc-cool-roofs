@@ -7,6 +7,7 @@ import geopandas as gpd
 import pandas as pd
 
 
+datasets_dir = r'K:\DataServices\datasets'
 
 ms4_parcels_folder = r'K:\DataServices\Projects\Current_Projects\Environment\MS4\Data\Spatial\Output\Parcels'
 
@@ -33,3 +34,4 @@ chart_fp = "K:\\DataServices\\Projects\\Current_Projects\\Climate_Change\\MVP_MM
 #mapc blocks
 mapc_blocks_fp = 'K:\\DataServices\\Projects\\Current_Projects\\Environment\\MS4\\Project\\MS4_Model.gdb'
 mapc_blocks = gpd.read_file(mapc_blocks_fp, layer='mapc_2020_blocks')
+
