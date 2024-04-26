@@ -9,6 +9,9 @@ import os
 
 
 datasets_dir = r'K:\DataServices\datasets'
+projects_dir = 'K:\\DataServices\\projects\\Current_Projects' 
+
+cool_roofs_project_dir = r'K:\DataServices\Projects\Current_Projects\Climate_Change\MVP_MMC_CoolRoofs_MVP'
 
 ms4_parcels_folder = r'K:\DataServices\Projects\Current_Projects\Environment\MS4\Data\Spatial\Output\Parcels'
 
@@ -41,7 +44,6 @@ munis_fp = os.path.join(datasets_dir, "Boundaries\Spatial\mapc_towns_poly.shp")
 munis = gpd.read_file(munis_fp)
 
 #environmental justice (2020 boundaries, updated in 2023)
-datasets_dir = r'K:\DataServices\datasets'
 ej_2020_gdb = os.path.join(datasets_dir, 'Environment and Energy\Environmental_Justice\ej2020.gdb')
 ej_2020 = gpd.read_file(ej_2020_gdb, layer='EJ_POLY')
 ej_field = 'EJ_CRIT_DESC'
@@ -49,3 +51,4 @@ ej_field = 'EJ_CRIT_DESC'
 #heat
 heat_fp = os.path.join(datasets_dir, 'Environment and Energy\Land_Surface_Temperature\Shapefile_LSTIndex\LSTindex.tif')
 
+mapc_lpd_folder = os.path.join(datasets_dir, 'Parcel_DB\\Data\\LPDB_Update_Dec.23_Jan.24\\parcels_by_muni')

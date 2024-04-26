@@ -10,29 +10,24 @@ import numpy
 #define variables
 
 #town name
-town_name = 'Revere'
+#town_name = 'Revere'
 
 #project geodatabase
 env.workspace = r'K:\DataServices\Projects\Current_Projects\Climate_Change\MVP_MMC_CoolRoofs_MVP\ArcGIS\CoolRoofs_Analysis.gdb'
-
 env.overwriteOutput = True
-
 arcpy.env.outputCoordinateSystem = arcpy.SpatialReference("NAD 1983 StatePlane Massachusetts FIPS 2001 (Meters)")
-
 sampling_value = .75
 
-def create_las_dataset(town_name):
+def create_las_dataset(las_folder, las_dataset):
     '''
     description
     '''
     #input variables
+
+    env.workspace = r'K:\DataServices\Projects\Current_Projects\Climate_Change\MVP_MMC_CoolRoofs_MVP\ArcGIS\CoolRoofs_Analysis.gdb'
+    env.overwriteOutput = True
+    arcpy.env.outputCoordinateSystem = arcpy.SpatialReference("NAD 1983 StatePlane Massachusetts FIPS 2001 (Meters)")
     
-    #folder that contains las data
-    las_folder = r"I:\Imagery\Eastern Mass Lidar\Revere Pilot"
-
-    #dataset file path
-    las_dataset = r"K:\DataServices\Datasets\MassGIS\LiDAR\Revere pilot\LAS Data\Revere pilot_LasDataset.lasd"
-
     arcpy.CreateLasDataset_management(input=las_folder,
                                     out_las_dataset=las_dataset,
                                     compute_stats='COMPUTE_STATS')
@@ -43,6 +38,11 @@ def create_ndsm_raster(town_name, las_dataset):
     '''
     description
     '''
+
+    env.workspace = r'K:\DataServices\Projects\Current_Projects\Climate_Change\MVP_MMC_CoolRoofs_MVP\ArcGIS\CoolRoofs_Analysis.gdb'
+    env.overwriteOutput = True
+    arcpy.env.outputCoordinateSystem = arcpy.SpatialReference("NAD 1983 StatePlane Massachusetts FIPS 2001 (Meters)")
+    
     #DTM
     ground_layer = town_name + '_ground_layer'
     ground_code = [1]
@@ -76,6 +76,7 @@ def create_ndsm_raster(town_name, las_dataset):
                                         sampling_value=sampling_value)
     
     ## DIGITAL SURFACE MODEL (DSM) ##
+    
 
     dsm_layer = arcpy.management.MakeLasDatasetLayer(in_las_dataset=las_dataset, 
                                                     out_layer = surface_layer, 
@@ -105,7 +106,10 @@ def create_slope_raster (town_name, ndsm_raster):
     '''
     describe
     '''
-
+    env.workspace = r'K:\DataServices\Projects\Current_Projects\Climate_Change\MVP_MMC_CoolRoofs_MVP\ArcGIS\CoolRoofs_Analysis.gdb'
+    env.overwriteOutput = True
+    arcpy.env.outputCoordinateSystem = arcpy.SpatialReference("NAD 1983 StatePlane Massachusetts FIPS 2001 (Meters)")
+    
     out_slope_raster = town_name + '_slope_buildings'
 
     ## SLOPE ##
@@ -120,7 +124,10 @@ def create_aspect_raster (town_name, ndsm_raster):
     '''
     describe
     '''
-
+    env.workspace = r'K:\DataServices\Projects\Current_Projects\Climate_Change\MVP_MMC_CoolRoofs_MVP\ArcGIS\CoolRoofs_Analysis.gdb'
+    env.overwriteOutput = True
+    arcpy.env.outputCoordinateSystem = arcpy.SpatialReference("NAD 1983 StatePlane Massachusetts FIPS 2001 (Meters)")
+    
     out_aspect_raster = town_name + '_aspect_buildings'
 
     ## ASPECT ##
@@ -135,6 +142,10 @@ def create_intensity_raster (town_name, las_dataset):
     '''
     describe
     '''
+    env.workspace = r'K:\DataServices\Projects\Current_Projects\Climate_Change\MVP_MMC_CoolRoofs_MVP\ArcGIS\CoolRoofs_Analysis.gdb'
+    env.overwriteOutput = True
+    arcpy.env.outputCoordinateSystem = arcpy.SpatialReference("NAD 1983 StatePlane Massachusetts FIPS 2001 (Meters)")
+    
 
     #intensity inputs
     out_intensity_raster = town_name + '_intensity'

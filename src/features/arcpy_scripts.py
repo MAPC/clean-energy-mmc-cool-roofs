@@ -1,6 +1,5 @@
 
 import arcpy
-from arcpy import env
 import pandas as pd
 from arcgis.features import GeoAccessor, GeoSeriesAccessor
 from arcpy.sa import *

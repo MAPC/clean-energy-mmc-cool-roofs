@@ -117,5 +117,13 @@ owner_types = [
     'COMMONWLTH OF',
     'COMM OF MASS',
     'UNITED STATES POSTAL SERVICE',
-    'V F W OF THE UNITED STATES INC'
+    'V F W OF THE UNITED STATES INC',
+    'HOUSING AUTHORITY'
+]
+
+muni_types = [
+    'TOWN OF',
+    'CITY OF',
+    'INHABITANTS OF',
+    'HOUSING AUTHORITY'
 ]
