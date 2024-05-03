@@ -4,7 +4,10 @@ from arcpy import env
 import pandas as pd
 from arcgis.features import GeoAccessor, GeoSeriesAccessor
 from arcpy.sa import *
-import numpy
+import os
+import geopandas as gpd
+
+from src.data.make_dataset import munis
 
 
 #define variables
@@ -18,21 +21,46 @@ env.overwriteOutput = True
 arcpy.env.outputCoordinateSystem = arcpy.SpatialReference("NAD 1983 StatePlane Massachusetts FIPS 2001 (Meters)")
 sampling_value = .75
 
-def create_las_dataset(las_folder, las_dataset):
+def create_las_dataset(town_name, las_folder):
     '''
     description
     '''
     #input variables
 
-    env.workspace = r'K:\DataServices\Projects\Current_Projects\Climate_Change\MVP_MMC_CoolRoofs_MVP\ArcGIS\CoolRoofs_Analysis.gdb'
     env.overwriteOutput = True
     arcpy.env.outputCoordinateSystem = arcpy.SpatialReference("NAD 1983 StatePlane Massachusetts FIPS 2001 (Meters)")
-    
-    arcpy.CreateLasDataset_management(input=las_folder,
-                                    out_las_dataset=las_dataset,
+    out_las_dataset = os.path.join(las_folder, (town_name + '_lasd.lasd'))
+
+    ### get a list of las tiles that intersect with the muni ###
+
+    muni_gdf = munis.loc[munis['municipal'] == town_name]
+    index_fp = r'I:\Imagery\MassGIS_LAS_files\goodies\goodies\indices\USGS_MA_CentralEastern_1_2021_TileIndex.shp'
+    index = gpd.read_file(index_fp)
+
+    #reproject all to mass mainland
+    mass_mainland_crs = "EPSG:26986"
+
+    index = index.to_crs(mass_mainland_crs)
+    muni_gdf = muni_gdf.to_crs(mass_mainland_crs)
+
+    intersecting = index.sjoin(muni_gdf, how='inner')
+    intersecting_list =  intersecting['Tile_ID'].tolist()
+
+    las_list = []
+
+    for item in intersecting_list:
+        for dirpath, dirnames, filenames in os.walk(las_folder):
+            for filename in filenames:
+                if item in filename: #ignores case
+                    if filename.endswith('.las'): #search for file type
+                        las_list.append(os.path.join(dirpath,filename))
+
+    #now create las dataset based on list of indexed tiles
+    arcpy.CreateLasDataset_management(input=las_list,
+                                    out_las_dataset=out_las_dataset,
                                     compute_stats='COMPUTE_STATS')
     
-    return las_dataset
+    return out_las_dataset
 
 def create_ndsm_raster(town_name, las_dataset):
     '''
@@ -67,7 +95,7 @@ def create_ndsm_raster(town_name, las_dataset):
                                                     class_code = ground_code,
                                                     return_values = ground_return_values)
 
-
+    
     arcpy.conversion.LasDatasetToRaster(in_las_dataset=dtm_layer, 
                                         out_raster=out_dtm_raster, 
                                         value_field='ELEVATION', 

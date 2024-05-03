@@ -6,17 +6,193 @@ from src.data.make_dataset import *
 from src.data.public_uses import *
 import numpy as np
 import matplotlib.pyplot as plt
-import textwrap
 import rasterio
-import rasterstats
 import os
 import zipfile36 as zipfile
 from io import BytesIO
 from urllib.request import urlopen
 import shutil
+import arcpy
+from arcpy.sa import *
 
 
+def make_coolroof_roofprints_layer(town_name):
+    print('try again')
+    from src.features.arcpy_scripts import reclassify_by_quantiles
 
+    #define variables for zonal stats
+    zonal_histogram_name = town_name + '_zonal_histogram'
+    zonal_stats_name = town_name + '_zonal_stats'
+    clipped_footprints = town_name + '_footprints' 
+    reclassified_slope_name = town_name + '_slope_reclassified'
+    zonal_stats_layer_name = town_name + '_zonal_stats_layer'
+    out_slope_raster = town_name + '_slope_buildings'
+    intensity_raster = town_name + '_intensity'
+
+    ## CLIP FOOTPRINTS TO RASTER EXTENT ##
+
+    ## RECLASSIFY SLOPE ##
+    if arcpy.Exists(clipped_footprints):
+            arcpy.Delete_management(clipped_footprints)
+
+    if arcpy.Exists(town_name + '_footprints_cool_roofs'):
+            arcpy.Delete_management(town_name + '_footprints_cool_roofs')
+
+    #first get extent
+    pnt_array = arcpy.Array()
+    extent = arcpy.Raster(out_slope_raster).extent
+    pnt_array.add(extent.lowerLeft)
+    pnt_array.add(extent.lowerRight)
+    pnt_array.add(extent.upperRight)
+    pnt_array.add(extent.upperLeft)
+
+    #polygon of extent
+    clip_poly = arcpy.Polygon(pnt_array)
+
+    #now clip
+    arcpy.analysis.Clip(in_features=massgis_footprints, 
+                        clip_features=clip_poly, 
+                        out_feature_class=clipped_footprints)
+
+
+    #first build attribute table
+    slope_reclassified = Reclassify(in_raster=out_slope_raster, 
+                            reclass_field="VALUE", 
+                            remap="0 17 1; 17 20 2;20 25 3;25 10000 4",  #add a variable for this
+                            missing_values="NODATA")
+
+    ## ZONAL HISTOGRAM ## 
+    zonal_histogram = ZonalHistogram(
+                            in_zone_data=clipped_footprints,
+                            zone_field="STRUCT_ID",
+                            in_value_raster=slope_reclassified,
+                            out_table=zonal_histogram_name,
+                            out_graph="",
+                            zones_as_rows="ZONES_AS_ROWS"
+                        )
+
+    #rename fields in histogram (automatically churns out CLASS_1, etc, but we want to specify slope)
+    fieldList = arcpy.ListFields(zonal_histogram)
+
+    for field in fieldList:
+        if field.name.split('_')[0] == 'CLASS':
+            arcpy.AlterField_management(in_table=zonal_histogram, 
+                                        field=field.name, 
+                                        new_field_alias=('SLOPE_' + field.name.split('_')[1]),
+                                        new_field_name=('SLOPE_' + field.name.split('_')[1]))
+        else:
+            pass
+
+
+    #need to add a field to make a join possible with zonal histogram
+    new_field = "join_id"
+    arcpy.management.CalculateField(
+                in_table=clipped_footprints,
+                field=new_field,
+                expression="'STRUC_'+ !STRUCT_ID!",
+                expression_type="PYTHON3",
+                code_block="",
+                field_type="TEXT",
+                enforce_domains="NO_ENFORCE_DOMAINS"
+            )
+
+    ## NOW JOIN ZONAL STATS + HISTOGRAM DATA TO STRUCTURES ##
+    arcpy.management.JoinField(
+                                in_data=clipped_footprints,
+                                in_field=new_field,
+                                join_table=zonal_histogram,
+                                join_field="LABEL",
+                                fields=['SLOPE_1']
+                            )
+
+
+    #SELECT ONLY NONNULL
+    arcpy.analysis.Select(
+                in_features=clipped_footprints,
+                out_feature_class=town_name + '_footprints_cool_roofs',
+                where_clause="SLOPE_1 IS NOT NULL",
+            )
+
+    ## ZONAL STATISTICS AS TABLE ##
+    with arcpy.EnvManager(snapRaster=slope_reclassified, extent=extent, cellSize=out_slope_raster):
+        ZonalStatisticsAsTable(
+                        in_zone_data=town_name + '_footprints_cool_roofs',
+                        zone_field="STRUCT_ID",
+                        in_value_raster=slope_reclassified,
+                        out_table= zonal_stats_name,
+                        ignore_nodata="DATA",
+                        statistics_type="MAJORITY_VALUE_COUNT_PERCENT"
+                        )
+
+    #ADD A FIRST PASS FLAT ROOF FIELD
+    field_name = 'flat_roof'
+    expression = "calc(!MAJORITY!)"
+    code_block = """def calc(field1):
+    if (field1 == 1):
+        return 1
+    else:
+        return 0"""
+
+
+    arcpy.management.CalculateField(
+        in_table=zonal_stats_name,
+        field=field_name,
+        expression=expression,
+        expression_type="PYTHON3",
+        code_block=code_block,
+        field_type="DOUBLE",
+        enforce_domains="NO_ENFORCE_DOMAINS"
+        )
+
+    arcpy.management.JoinField(
+                                in_data=town_name + '_footprints_cool_roofs',
+                                in_field='STRUCT_ID',
+                                join_table=zonal_stats_name,
+                                join_field="STRUCT_ID",
+                                fields=['MAJORITY', 'MAJORITY_PERCENT', 'flat_roof']
+                            )
+
+    ## NOW DO INTENSITY ## 
+    intensity_reclassified = reclassify_by_quantiles(intensity_raster, 10)
+
+    
+    ## ZONAL STATISTICS AS TABLE ##
+    with arcpy.EnvManager(snapRaster=intensity_reclassified, 
+                        extent=extent, 
+                        cellSize=intensity_reclassified):
+        ZonalStatisticsAsTable(
+                        in_zone_data=town_name + '_footprints_cool_roofs',
+                        zone_field="STRUCT_ID",
+                        in_value_raster=intensity_reclassified,
+                        out_table= zonal_stats_name,
+                        ignore_nodata="DATA",
+                        statistics_type="MAJORITY_VALUE_COUNT_PERCENT"
+                        )
+
+    arcpy.AlterField_management(in_table=zonal_stats_name, 
+                                        field='MAJORITY', 
+                                        new_field_alias='Int_Maj',
+                                        new_field_name='Int_Maj')
+
+                                        
+    arcpy.AlterField_management(in_table=zonal_stats_name, 
+                                        field='MAJORITY_PERCENT', 
+                                        new_field_alias='Int_MajP',
+                                        new_field_name='Int_MajP')
+
+    arcpy.management.JoinField(
+                                in_data=town_name + '_footprints_cool_roofs',
+                                in_field='STRUCT_ID',
+                                join_table=zonal_stats_name,
+                                join_field="STRUCT_ID",
+                                fields=['Int_Maj', 'Int_MajP']
+                            )
+
+
+    arcpy.Delete_management(zonal_histogram_name)
+    arcpy.Delete_management(zonal_stats_name)
+    arcpy.Delete_management(clipped_footprints)
+    arcpy.Delete_management(zonal_stats_layer_name)
 
 def get_file(dir_name:str,
              muni:str=None,
@@ -177,7 +353,7 @@ def get_heat_score_mmc(heat_index_fp):
 
     '''
     from rasterstats import zonal_stats
-    from src.data.make_dataset import mapc_blocks, mmc_munis, munis
+    from src.data.make_dataset import mapc_blocks, mmc_munis, munis, intermediate_path
 
 
     with rasterio.open(heat_index_fp) as raster:
@@ -210,6 +386,10 @@ def get_heat_score_mmc(heat_index_fp):
     ## COMPARE LST MEAN TO REST OF MMC REGION ##    
     #rank each block based on relative lst index score
     mmc_blocks_heat['rnk_heat_mmc'] = mmc_blocks_heat['lst_mean'].rank(method='min', pct=True)
+
+    
+    mmc_blocks_export = os.path.join(intermediate_path, 'mmc_blocks_heat.shp')
+    muni_structures_join_parcels.to_file(mmc_blocks_export)
 
     return mmc_blocks_heat
 
@@ -396,6 +576,9 @@ def cool_roof_process(town_name,
 
     ej_parcels['EJ'] = ej_parcels['EJ'].fillna('No')
 
+
+
+
     ## JOIN STRUCTURES TO PARCELS ##
 
     #spatially join structures to parcels, group by structure id to eliminate duplicates
@@ -415,7 +598,15 @@ def cool_roof_process(town_name,
                                                              by='STRUCT_ID').agg(
                                                                  'first').set_crs(
                                                                      mass_mainland_crs).reset_index().drop(columns='index_right')
-    
+    ## ROOFTOP SIZE ##
+    muni_structures_join_parcels['roof_sqm'] = muni_structures_join_parcels['geometry'].area
+    muni_structures_join_parcels['roof_sqf'] = muni_structures_join_parcels['roof_sqm'] * 10.764
+
+    #export to intermediate folder
+    data_folder = r'K:\DataServices\Projects\Current_Projects\Climate_Change\MVP_MMC_CoolRoofs_MVP\Data\Intermediate'
+    export = os.path.join(data_folder, (town_name + '_cool_roofs.shp'))
+    muni_structures_join_parcels.to_file(export)
+
 
     return(muni_structures_join_parcels)
 

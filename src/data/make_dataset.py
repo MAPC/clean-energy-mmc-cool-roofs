@@ -12,6 +12,7 @@ datasets_dir = r'K:\DataServices\datasets'
 projects_dir = 'K:\\DataServices\\projects\\Current_Projects' 
 
 cool_roofs_project_dir = r'K:\DataServices\Projects\Current_Projects\Climate_Change\MVP_MMC_CoolRoofs_MVP'
+cool_roofs_gdb = gdb = os.path.join(cool_roofs_project_dir, 'ArcGIS\CoolRoofs_Analysis.gdb')
 
 ms4_parcels_folder = r'K:\DataServices\Projects\Current_Projects\Environment\MS4\Data\Spatial\Output\Parcels'
 
@@ -22,6 +23,8 @@ mmc_munis = ['Arlington', 'Boston', 'Braintree', 'Brookline', 'Cambridge', 'Chel
 #building structures
 building_structures_gdb = 'K:\\DataServices\\Datasets\\MassGIS\\Facilities_Structures\\Building_Structures\\Output\\structures.gdb'
 building_structures_layer = 'STRUCTURES_POLY'
+
+massgis_footprints = r'K:\DataServices\Datasets\MassGIS\Facilities_Structures\Building_Structures\Output\structures.gdb\STRUCTURES_POLY'
 
 #lookup tables
 land_use_lookup_fp = r"K:\DataServices\Projects\Current_Projects\Climate_Change\MVP_MMC_CoolRoofs_MVP\Data\lookup_tables\land_use_lookup.csv"
@@ -52,3 +55,5 @@ ej_field = 'EJ_CRIT_DESC'
 heat_fp = os.path.join(datasets_dir, 'Environment and Energy\Land_Surface_Temperature\Shapefile_LSTIndex\LSTindex.tif')
 
 mapc_lpd_folder = os.path.join(datasets_dir, 'Parcel_DB\\Data\\LPDB_Update_Dec.23_Jan.24\\parcels_by_muni')
+
+intermediate_layer = r'K:\DataServices\Projects\Current_Projects\Climate_Change\MVP_MMC_CoolRoofs_MVP\Data\Intermediate'
