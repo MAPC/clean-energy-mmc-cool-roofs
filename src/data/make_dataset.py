@@ -10,18 +10,21 @@ import os
 
 datasets_dir = r'K:\DataServices\datasets'
 projects_dir = 'K:\\DataServices\\projects\\Current_Projects' 
+desktop_dir = r'C:\Users\rbowers\Desktop\Data_Cool_Roofs'
+
+las_folder = r'I:\Imagery\MassGIS_LAS_files'
 
 cool_roofs_project_dir = r'K:\DataServices\Projects\Current_Projects\Climate_Change\MVP_MMC_CoolRoofs_MVP'
-cool_roofs_gdb = gdb = os.path.join(cool_roofs_project_dir, 'ArcGIS\CoolRoofs_Analysis.gdb')
-
-ms4_parcels_folder = r'K:\DataServices\Projects\Current_Projects\Environment\MS4\Data\Spatial\Output\Parcels'
+#cool_roofs_gdb = os.path.join(cool_roofs_project_dir, 'ArcGIS\CoolRoofs_Analysis.gdb')
+cool_roofs_gdb = r'C:\Users\rbowers\Desktop\cool_roof_analysis_offnetwork.gdb'
 
 mmc_munis = ['Arlington', 'Boston', 'Braintree', 'Brookline', 'Cambridge', 'Chelsea', 
              'Everett', 'Malden', 'Medford', 'Melrose', 'Newton', 'Quincy', 
              'Revere', 'Somerville', 'Watertown', 'Winthrop']
 
 #building structures
-building_structures_gdb = 'K:\\DataServices\\Datasets\\MassGIS\\Facilities_Structures\\Building_Structures\\Output\\structures.gdb'
+#building_structures_gdb = os.path.join(datasets_dir, 'MassGIS\Facilities_Structures\Building_Structures\Output\structures.gdb')
+building_structures_fp = os.path.join(desktop_dir, 'structures.gdb\STRUCTURES_POLY')
 building_structures_layer = 'STRUCTURES_POLY'
 
 massgis_footprints = r'K:\DataServices\Datasets\MassGIS\Facilities_Structures\Building_Structures\Output\structures.gdb\STRUCTURES_POLY'
@@ -43,8 +46,10 @@ mapc_blocks_fp = 'K:\\DataServices\\Projects\\Current_Projects\\Environment\\MS4
 mapc_blocks = gpd.read_file(mapc_blocks_fp, layer='mapc_2020_blocks')
 
 #municipalities
-munis_fp = os.path.join(datasets_dir, "Boundaries\Spatial\mapc_towns_poly.shp")
-munis = gpd.read_file(munis_fp)
+#munis_fp = os.path.join(datasets_dir, "Boundaries\Spatial\mapc_towns_poly.shp")
+munis_fp = os.path.join(desktop_dir, 'TOWNSSURVEY_POLY.shp')
+munis=gpd.read_file(munis_fp)
+muni_field = 'TOWN'
 
 #environmental justice (2020 boundaries, updated in 2023)
 ej_2020_gdb = os.path.join(datasets_dir, 'Environment and Energy\Environmental_Justice\ej2020.gdb')
@@ -56,4 +61,7 @@ heat_fp = os.path.join(datasets_dir, 'Environment and Energy\Land_Surface_Temper
 
 mapc_lpd_folder = os.path.join(datasets_dir, 'Parcel_DB\\Data\\LPDB_Update_Dec.23_Jan.24\\parcels_by_muni')
 
-intermediate_layer = r'K:\DataServices\Projects\Current_Projects\Climate_Change\MVP_MMC_CoolRoofs_MVP\Data\Intermediate'
+intermediate_path = r'K:\DataServices\Projects\Current_Projects\Climate_Change\MVP_MMC_CoolRoofs_MVP\Data\Intermediate'
+#mmc_heat_export_path = os.path.join(intermediate_path, 'mmc_blocks_heat.shp')
+mmc_heat_export_path = os.path.join(desktop_dir, 'mmc_blocks_heat.shp')
+mmc_heat_blocks = gpd.read_file(mmc_heat_export_path)
