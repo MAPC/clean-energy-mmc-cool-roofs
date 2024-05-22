@@ -78,65 +78,6 @@ def make_coolroof_roofprints_layer(town_name):
                             reclass_field="VALUE", 
                             remap="0 17 1; 17 20 2;20 25 3;25 10000 4",  
                             missing_values="NODATA")
-    '''
-    print('zonal histogram')
- 
-   ## ZONAL HISTOGRAM ## 
-    zonal_histogram = ZonalHistogram(
-                            in_zone_data=clipped_footprints,
-                            zone_field="STRUCT_ID",
-                            in_value_raster=slope_reclassified,
-                            out_table=zonal_histogram_name,
-                            out_graph="",
-                            zones_as_rows="ZONES_AS_ROWS"
-                        )
-
-    #rename fields in histogram (automatically churns out CLASS_1, etc, but we want to specify slope)
-    fieldList = arcpy.ListFields(zonal_histogram)
-
-    for field in fieldList:
-        if field.name.split('_')[0] == 'CLASS':
-            arcpy.AlterField_management(in_table=zonal_histogram, 
-                                        field=field.name, 
-                                        new_field_alias=('SLOPE_' + field.name.split('_')[1]),
-                                        new_field_name=('SLOPE_' + field.name.split('_')[1]))
-        else:
-            pass
-
-   
-    #need to add a field to make a join possible with zonal histogram
-    new_field = "join_id"
-    arcpy.management.CalculateField(
-                in_table=clipped_footprints,
-                field=new_field,
-                expression="'STRUC_'+ !STRUCT_ID!",
-                expression_type="PYTHON3",
-                code_block="",
-                field_type="TEXT",
-                enforce_domains="NO_ENFORCE_DOMAINS"
-            )
-    
-    
-    print('joining')
-    ## NOW JOIN ZONAL STATS + HISTOGRAM DATA TO STRUCTURES ##
-    arcpy.management.JoinField(
-                                in_data=clipped_footprints,
-                                in_field=new_field,
-                                join_table=zonal_histogram,
-                                join_field="LABEL"#,
-                                #fields=['SLOPE_1']
-                            )
-
-
-    #SELECT ONLY NONNULL
-    arcpy.analysis.Select(
-                in_features=clipped_footprints,
-                out_feature_class=cool_roofs_layer,
-                where_clause="SLOPE_1 IS NOT NULL",
-            )
-    
-    print('zonal stats as table')
-    '''
 
     ## ZONAL STATISTICS AS TABLE ##
     with arcpy.EnvManager(snapRaster=town_slope_raster, 
@@ -180,58 +121,12 @@ def make_coolroof_roofprints_layer(town_name):
                                 join_field="STRUCT_ID",
                                 fields=['MAJORITY', 'MAJORITY_PERCENT', 'flat_roof']
                             )
-    print('intensity')
-
-    ''' 
-   ## NOW DO INTENSITY ## 
-
-    #clip slope raster to town boundary
-    print('extract by mask, intensity')
+  
     
     town_intensity_raster = ExtractByMask(intensity_raster, 
                                         town_boundary,
                                         "INSIDE")
 
-    print('zonal statistics, intensity')
-
-    with arcpy.EnvManager(snapRaster=town_intensity_raster, 
-                        #extent=town_boundary, 
-                        cellSize=town_intensity_raster):
-        ZonalStatisticsAsTable(
-                        in_zone_data=clipped_footprints,
-                        zone_field="STRUCT_ID",
-                        in_value_raster=town_intensity_raster,
-                        out_table= zonal_stats_name,
-                        ignore_nodata="DATA",
-                        statistics_type="MEDIAN"
-                        )
-        
-    arcpy.management.JoinField(
-                                in_data=clipped_footprints,
-                                in_field='STRUCT_ID',
-                                join_table=zonal_stats_name,
-                                join_field="STRUCT_ID",
-                                fields=['MEDIAN']
-                            )
-
-    arcpy.management.ReclassifyField(in_table=clipped_footprints, 
-                                                              field='MEDIAN', 
-                                                              method='QUANTILE', 
-                                                              classes=10,
-                                                              output_field_name='Intensity'
-                                                              )
-    '''
-                                                            
-    #intensity_reclassified = reclassify_by_quantiles(town_intensity_raster, 10) #reclassify by quantiles
-
-    
-    print('extract by mask, intensity')
-    
-    town_intensity_raster = ExtractByMask(intensity_raster, 
-                                        town_boundary,
-                                        "INSIDE")
-
-    print('reclassify, intensity')
     
     intensity_reclassified = arcpy.sa.Reclassify(
                             in_raster=town_intensity_raster,
