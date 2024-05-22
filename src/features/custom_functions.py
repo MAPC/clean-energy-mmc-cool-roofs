@@ -32,7 +32,7 @@ def make_coolroof_roofprints_layer(town_name):
     zonal_stats_layer_name = os.path.join(cool_roofs_gdb, (town_name + '_zonal_stats_layer'))
     out_slope_raster = os.path.join(cool_roofs_gdb, (town_name + '_slope_buildings'))
     intensity_raster = os.path.join(cool_roofs_gdb, (town_name + '_intensity'))
-    cool_roofs_layer = os.path.join(cool_roofs_gdb, (town_name + '_footprints_cool_roofs'))
+    cool_roof_footprints = os.path.join(cool_roofs_gdb, (town_name + '_cool_roofs'))
  
     ## CLIP FOOTPRINTS TO RASTER EXTENT ##
 
@@ -181,25 +181,75 @@ def make_coolroof_roofprints_layer(town_name):
                                 fields=['MAJORITY', 'MAJORITY_PERCENT', 'flat_roof']
                             )
     print('intensity')
-    ## NOW DO INTENSITY ## 
+
+    ''' 
+   ## NOW DO INTENSITY ## 
 
     #clip slope raster to town boundary
     print('extract by mask, intensity')
     
     town_intensity_raster = ExtractByMask(intensity_raster, 
-                                      town_boundary,
-                                    "INSIDE")
+                                        town_boundary,
+                                        "INSIDE")
+
+    print('zonal statistics, intensity')
+
+    with arcpy.EnvManager(snapRaster=town_intensity_raster, 
+                        #extent=town_boundary, 
+                        cellSize=town_intensity_raster):
+        ZonalStatisticsAsTable(
+                        in_zone_data=clipped_footprints,
+                        zone_field="STRUCT_ID",
+                        in_value_raster=town_intensity_raster,
+                        out_table= zonal_stats_name,
+                        ignore_nodata="DATA",
+                        statistics_type="MEDIAN"
+                        )
+        
+    arcpy.management.JoinField(
+                                in_data=clipped_footprints,
+                                in_field='STRUCT_ID',
+                                join_table=zonal_stats_name,
+                                join_field="STRUCT_ID",
+                                fields=['MEDIAN']
+                            )
+
+    arcpy.management.ReclassifyField(in_table=clipped_footprints, 
+                                                              field='MEDIAN', 
+                                                              method='QUANTILE', 
+                                                              classes=10,
+                                                              output_field_name='Intensity'
+                                                              )
+    '''
+                                                            
+    #intensity_reclassified = reclassify_by_quantiles(town_intensity_raster, 10) #reclassify by quantiles
+
+    
+    print('extract by mask, intensity')
+    
+    town_intensity_raster = ExtractByMask(intensity_raster, 
+                                        town_boundary,
+                                        "INSIDE")
 
     print('reclassify, intensity')
     
-    intensity_reclassified = arcpy.management.ReclassifyField(in_table=town_intensity_raster, 
-                                                              field='VALUE', 
-                                                              method='QUANTILE', 
-                                                              classes=10)
-    
-    intensity_reclassified = reclassify_by_quantiles(town_intensity_raster, 10) #reclassify by quantiles
+    intensity_reclassified = arcpy.sa.Reclassify(
+                            in_raster=town_intensity_raster,
+                            reclass_field="VALUE",
+                            remap="14832 25569.105882 1;\
+                                25569.105882 28153.964706 2;\
+                                    28153.964706 30937.658824 3;\
+                                        30937.658824 33323.682353 4;\
+                                            33323.682353 35510.870588 5;\
+                                                35510.870588 37896.894118 6;\
+                                                    37896.894118 39885.247059 7;\
+                                                        39885.247059 41475.929412 8;\
+                                                            41475.929412 44856.129412 9;\
+                                                                44856.129412 65535 10",
+                            missing_values="NODATA"
+                            )
 
-    print('zonal stats')
+    #out_raster.save(r"K:\DataServices\Projects\Current_Projects\Climate_Change\MVP_MMC_CoolRoofs_MVP\ArcGIS\CoolRoofs_Analysis.gdb\reclassify_10_quantiles")
     
     ## ZONAL STATISTICS AS TABLE ##
     with arcpy.EnvManager(snapRaster=intensity_reclassified, 
@@ -215,22 +265,17 @@ def make_coolroof_roofprints_layer(town_name):
                         )
 
     arcpy.AlterField_management(in_table=zonal_stats_name, 
-                                        field='MAJORITY', 
-                                        new_field_alias='Int_Maj',
-                                        new_field_name='Int_Maj')
+                                field='MAJORITY', 
+                                new_field_alias='Int_Maj',
+                                new_field_name='Int_Maj')
 
-                                        
-    arcpy.AlterField_management(in_table=zonal_stats_name, 
-                                        field='MAJORITY_PERCENT', 
-                                        new_field_alias='Int_MajP',
-                                        new_field_name='Int_MajP')
-
+                             
     arcpy.management.JoinField(
                                 in_data=clipped_footprints,
                                 in_field='STRUCT_ID',
                                 join_table=zonal_stats_name,
                                 join_field="STRUCT_ID",
-                                fields=['Int_Maj', 'Int_MajP']
+                                fields=['Int_Maj']
                             )
 
 
