@@ -16,7 +16,7 @@ import arcpy
 from arcpy.sa import *
 from arcpy import env
 
-from src.data.make_dataset import cool_roofs_gdb, building_structures_fp, munis_fp, muni_field
+from src.data.make_dataset import cool_roofs_gdb, building_structures_fp, munis_fp, muni_field, boston_parcels
 
 
 
@@ -112,8 +112,6 @@ def make_coolroof_roofprints_layer(town_name):
         enforce_domains="NO_ENFORCE_DOMAINS"
         )
     
-    print('joining')
-
     arcpy.management.JoinField(
                                 in_data=clipped_footprints,
                                 in_field='STRUCT_ID',
@@ -270,43 +268,58 @@ def get_landuse_data(muni):
              merges with mapc land parcel database 
     output = state detailed parcel layer, merged with mapc land parcel database
     '''
-    from src.data.make_dataset import mapc_lpd_folder    
-    from datetime import datetime
+    from src.data.make_dataset import mapc_lpd_folder, boston_parcels, mass_mainland_crs    
 
     def get_most_updated_state_assessors_data(muni):
+
         '''
-        pulls parcel data from the state's assessors website
+        pulls parcel data from the state's assessors website (with an exception for Boston who hosts separately)
         '''
-        #get shapefile from a massgis link
-        shapefile_excel = 'https://www.mass.gov/doc/massgis-parcel-data-download-links-table/download'
-        shapefile_lookup = pd.read_excel(shapefile_excel)
-
-        town_shp_lookup_link = shapefile_lookup.loc[shapefile_lookup['Town Name'] == muni.upper()]
-
-        #extract into a temporary folder for use
-        cool_roofs_project_dir = r'K:\DataServices\Projects\Current_Projects\Climate_Change\MVP_MMC_CoolRoofs_MVP'
-        path = os.path.join(cool_roofs_project_dir, 'Data', muni) #make a subdirectory in ortho folder w town name
-        os.makedirs(path, exist_ok=True) 
-
-        for url in town_shp_lookup_link['Shapefile Download URL'].tolist():
-            with urlopen(url) as zipresp:
-                with zipfile.ZipFile(BytesIO(zipresp.read())) as zfile:
-                    zfile.extractall(path)
-
-
-        layer = get_file(path, 'TaxPar', '.shp')
-        parcel_layer = gpd.read_file(layer)
-
-        parcel_layer = parcel_layer.loc[parcel_layer['POLY_TYPE']=='FEE']
-        return(parcel_layer)
+        if muni == 'Boston':
+            #get shapefile from boston's open data portal and download
+            #change in make_dataset.py
     
+            parcel_layer = boston_parcels.copy()
+
+            parcel_layer = parcel_layer.loc[parcel_layer['POLY_TYPE']=='FEE']
+            return(parcel_layer)
+        
+
+        else:
+
+            #get shapefile from a massgis link
+            shapefile_excel = 'https://www.mass.gov/doc/massgis-parcel-data-download-links-table/download'
+            shapefile_lookup = pd.read_excel(shapefile_excel)
+
+            town_shp_lookup_link = shapefile_lookup.loc[shapefile_lookup['Town Name'] == muni.upper()]
+
+            #extract into a temporary folder for use
+            cool_roofs_project_dir = r'K:\DataServices\Projects\Current_Projects\Climate_Change\MVP_MMC_CoolRoofs_MVP'
+            path = os.path.join(cool_roofs_project_dir, 'Data', muni) #make a subdirectory in ortho folder w town name
+            os.makedirs(path, exist_ok=True) 
+
+            for url in town_shp_lookup_link['Shapefile Download URL'].tolist():
+                with urlopen(url) as zipresp:
+                    with zipfile.ZipFile(BytesIO(zipresp.read())) as zfile:
+                        zfile.extractall(path)
+
+
+            layer = get_file(path, 'TaxPar', '.shp')
+            parcel_layer = gpd.read_file(layer)
+
+            parcel_layer = parcel_layer.loc[parcel_layer['POLY_TYPE']=='FEE']
+            return(parcel_layer)
+        
 
     #get the most updated parcel data from massgis
     muni_state_parcels = get_most_updated_state_assessors_data(muni)
 
     #now delete the temporary folder that was made for that layer
-    path = os.path.join(cool_roofs_project_dir, 'Data', muni)
-    shutil.rmtree(path)
+    if muni == 'Boston':
+        pass
+    else:
+        path = os.path.join(cool_roofs_project_dir, 'Data', muni)
+        shutil.rmtree(path)
 
     #read in land parcel database
     file_name = get_file(dir_name=mapc_lpd_folder, 
@@ -321,6 +334,8 @@ def get_landuse_data(muni):
     muni_lpd_preprocess = muni_state_parcels[['LOC_ID', 'geometry']].merge(mapc_lpd, 
                                                                            on='LOC_ID', 
                                                                            how='inner')
+    
+    muni_lpd_preprocess = muni_lpd_preprocess.to_crs(mass_mainland_crs)
 
     return(muni_lpd_preprocess)  
     
@@ -472,6 +487,7 @@ def cool_roof_process(town_name,
     
     muni_parcels = get_landuse_data(town_name)
 
+
     fields_to_keep = ['LOC_ID', 'SITE_ADDR_M', 'CITY', 'OWNER1', 'geometry', 'TOWN_ID', 'BLDG_VAL', 
                       'LOT_SIZE', 'L3_Description_M', 'LUC_Assign_M',
                       'YEAR_BUILT', 'STYLE', 'imputed_units', 'FAR', 'BLDGV_PSF', 'BLDLND_RAT']
@@ -500,7 +516,6 @@ def cool_roof_process(town_name,
                                       right_on='use_code_3dg', 
                                       how='left').groupby(
                                           by='LOC_ID').agg('first').reset_index()
-
     #get real estate typology descriptions based on real estate codes
     muni_parcels = muni_parcels.merge(real_estate_lookup_code, 
                                       on='real_estate_type', 
@@ -552,14 +567,13 @@ def cool_roof_process(town_name,
     #field for whether or not the parcel is in an EJ census block group
     ej_cols_to_keep = ['geometry', 'EJ', 'EJ_CRITERIA_COUNT', 'EJ_CRIT_DESC']
 
-    ej_parcels = gpd.sjoin(muni_parcels.drop(columns='index_right'), ej_2020[ej_cols_to_keep],
+    ej_parcels = gpd.sjoin(muni_parcels.drop(columns='index_right'), 
+                           ej_2020[ej_cols_to_keep],
                            how='left').groupby(
-                        by='LOC_ID').agg('first').reset_index().set_crs(mass_mainland_crs)
+                            by='LOC_ID').agg('first').reset_index().set_crs(mass_mainland_crs)
 
 
     ej_parcels['EJ'] = ej_parcels['EJ'].fillna('No')
-
-
 
 
     ## JOIN STRUCTURES TO PARCELS ##
@@ -573,7 +587,7 @@ def cool_roof_process(town_name,
     
     #clip structures to muni parcels layer, drop unneeded columns, reproject
     structures_data = rooftops_layer.drop(columns=structures_fields_to_drop).clip(muni_parcels).to_crs(mass_mainland_crs)
-
+    
     
     muni_structures_join_parcels = structures_data.sjoin(ej_parcels.drop(columns='index_right'), 
                                                          how='left').groupby(
@@ -585,8 +599,7 @@ def cool_roof_process(town_name,
     muni_structures_join_parcels['roof_sqf'] = muni_structures_join_parcels['roof_sqm'] * 10.764
 
     #export to intermediate folder
-    data_folder = r'K:\DataServices\Projects\Current_Projects\Climate_Change\MVP_MMC_CoolRoofs_MVP\Data\Intermediate'
-    export = os.path.join(data_folder, (town_name + '_cool_roofs.shp'))
+    export = os.path.join(intermediate_path, (town_name + '_cool_roofs.shp'))
     muni_structures_join_parcels.to_file(export)
 
 
