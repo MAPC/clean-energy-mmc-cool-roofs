@@ -21,7 +21,9 @@ from src.data.make_dataset import cool_roofs_gdb, building_structures_fp, munis_
 
 
 def make_coolroof_roofprints_layer(town_name):
-    from src.features.arcpy_scripts import reclassify_by_quantiles
+    '''
+    Rachel to fill in
+    '''
 
     env.overwriteOutput = True
 
@@ -40,7 +42,6 @@ def make_coolroof_roofprints_layer(town_name):
     
     #get footprints from muni
 
-    print('get town boundary')
 
     town_boundary = arcpy.management.SelectLayerByAttribute(
                                             in_layer_or_view=munis_fp,
@@ -48,7 +49,6 @@ def make_coolroof_roofprints_layer(town_name):
                                             where_clause="TOWN = '{}'".format(town_name.upper()),
                                             invert_where_clause=None)
     
-    print('town footprints')
     
     selection = arcpy.management.SelectLayerByLocation(
                                             in_layer=building_structures_fp,
@@ -62,7 +62,6 @@ def make_coolroof_roofprints_layer(town_name):
     arcpy.management.CopyFeatures(selection, clipped_footprints)
 
     #clip slope raster to town boundary
-    print('extract by mask')
     
     town_slope_raster = ExtractByMask(out_slope_raster, 
                                       town_boundary,
@@ -72,7 +71,6 @@ def make_coolroof_roofprints_layer(town_name):
     #                    clip_features=munis_fp, 
     #                    out_feature_class=clipped_footprints)
 
-    print('reclassify')
     #first reclassify slope pixels to integers, where the value of 1 represents lowest slope, etc
     slope_reclassified = Reclassify(in_raster=town_slope_raster, 
                             reclass_field="VALUE", 
@@ -125,7 +123,8 @@ def make_coolroof_roofprints_layer(town_name):
                                         town_boundary,
                                         "INSIDE")
 
-    
+    #using values based on quantile divisions for a few different munis
+    #ideally would be automated, but that was erroring
     intensity_reclassified = arcpy.sa.Reclassify(
                             in_raster=town_intensity_raster,
                             reclass_field="VALUE",
@@ -400,7 +399,7 @@ def get_muni_heat_score(mmc_blocks_heat,
    
 
     ## COMPARE LST MEAN TO REST OF MUNI ## 
-    muni_gdf = munis.loc[munis[muni_field] == town_name]
+    muni_gdf = munis.loc[munis[muni_field].str.casefold() == town_name.casefold()]
     
     #clip mmc blocks (with heat field) to muni and eliminate sliver blocks that remain
     mmc_blocks_heat['og_area'] = mmc_blocks_heat['geometry'].area
@@ -466,25 +465,21 @@ def cool_roof_process(town_name,
                       rooftops_layer,
                       heat_blocks_layer):
     
-    from datetime import datetime
 
     '''
     ## Rachel to fill in ## 
     
-    Analyzes the breakdown of structures located in high heat areas in a municipality of interest.
+    
 
     INPUTS
-    - file path for shapefile of parcels with ownership and heat info (can replicate if need be)
+    - 
 
     OUTPUTS 
     - 
-    In this script, "high heat" areas refers to the census blocks that are in the top 20% of hottest census blocks in /
-    the municipality.
 
     '''
     ## BRING IN PARCEL AND STRUCTURES DATA ##
     #repurpose 3A script to get parcels with MAPC Land Parcel Database info attached
-    
     muni_parcels = get_landuse_data(town_name)
 
 
@@ -527,7 +522,6 @@ def cool_roof_process(town_name,
     #determine highest heat parcels based on 'rnk_heat' value. high heat in this case means being in the
     #top 20% of hottest census blocks
 
-
     mass_mainland_crs = "EPSG:26986"
     muni_parcels = muni_parcels.set_crs(mass_mainland_crs)
     muni_parcels = get_muni_heat_score(mmc_blocks_heat=heat_blocks_layer,
@@ -566,7 +560,6 @@ def cool_roof_process(town_name,
     ## ENVIRONMENTAL JUSTICE ## 
     #field for whether or not the parcel is in an EJ census block group
     ej_cols_to_keep = ['geometry', 'EJ', 'EJ_CRITERIA_COUNT', 'EJ_CRIT_DESC']
-
     ej_parcels = gpd.sjoin(muni_parcels.drop(columns='index_right'), 
                            ej_2020[ej_cols_to_keep],
                            how='left').groupby(
@@ -586,8 +579,7 @@ def cool_roof_process(town_name,
                                  'EDIT_BY', 'COMMENTS', 'join_id']
     
     #clip structures to muni parcels layer, drop unneeded columns, reproject
-    structures_data = rooftops_layer.drop(columns=structures_fields_to_drop).clip(muni_parcels).to_crs(mass_mainland_crs)
-    
+    structures_data = rooftops_layer.drop(columns=structures_fields_to_drop).to_crs(mass_mainland_crs)#.clip(muni_parcels).to_crs(mass_mainland_crs)
     
     muni_structures_join_parcels = structures_data.sjoin(ej_parcels.drop(columns='index_right'), 
                                                          how='left').groupby(
@@ -604,5 +596,6 @@ def cool_roof_process(town_name,
 
 
     return(muni_structures_join_parcels)
+
 
 

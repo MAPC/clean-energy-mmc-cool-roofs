@@ -1,7 +1,8 @@
-cool-roofs
 ==============================
 
-cool roofs analysis for clean energy team
+The goal of Task 4 of the Metro Boston Cool Roofs Project is to develop a site suitability analysis that identifies prime locations for cool roof installations in the Metro Mayors region. The analysis assesses each rooftop based on key physical characteristics of the roofs themselves as well as the environmental, economic, and social characteristics of the land parcels and census geographies in which they reside. 
+
+This methodology uses LIDAR data, provided by MassGIS, to extract roof shapes and color intensity to identify flat and dark roofs on buildings in the 16 Metro Mayors communities. Once potential cool roof sites (i.e., flat, dark roofs) are identified, MAPC used Python to join the sites with parcel data and summarized statistics (e.g., total number and square footage of residential vs commercial vs municipal cool roof sites).  
 
 Project Organization
 ------------
@@ -9,19 +10,11 @@ Project Organization
     ├── LICENSE
     ├── Makefile           <- Makefile with commands like `make data` or `make train`
     ├── README.md          <- The top-level README for developers using this project.
-    ├── data
-    │   ├── external       <- Data from third party sources.
-    │   ├── interim        <- Intermediate data that has been transformed.
-    │   ├── processed      <- The final, canonical data sets for modeling.
-    │   └── raw            <- The original, immutable data dump.
     │
     ├── docs               <- A default Sphinx project; see sphinx-doc.org for details
-    │
-    ├── models             <- Trained and serialized models, model predictions, or model summaries
-    │
-    ├── notebooks          <- Jupyter notebooks. Naming convention is a number (for ordering),
-    │                         the creator's initials, and a short `-` delimited description, e.g.
-    │                         `1.0-jqp-initial-data-exploration`.
+    │    
+    ├── notebooks          <- Jupyter notebooks.
+    │   ├── 01-running-cool-roof-process.ipynb    <- runs scripts for MMC communities
     │
     ├── references         <- Data dictionaries, manuals, and all other explanatory materials.
     │
@@ -36,18 +29,13 @@ Project Organization
     │   ├── __init__.py    <- Makes src a Python module
     │   │
     │   ├── data           <- Scripts to download or generate data
-    │   │   └── make_dataset.py
+    │   │   └── make_dataset.py  <-reads in data layers from MAPC's network drives
+    │   │   └── muni_uses.py     <- lists land uses that are associated with municipal ownership
+    │   │   └── public_uses.py   <- lists land uses that are associated with public ownership
     │   │
     │   ├── features       <- Scripts to turn raw data into features for modeling
-    │   │   └── build_features.py
-    │   │
-    │   ├── models         <- Scripts to train models and then use trained models to make
-    │   │   │                 predictions
-    │   │   ├── predict_model.py
-    │   │   └── train_model.py
-    │   │
-    │   └── visualization  <- Scripts to create exploratory and results oriented visualizations
-    │       └── visualize.py
+    │   │   └── create_rasters.py   <- ArcPy-based functions for transforming Lidar into rasters
+    │   │   └── custom_functions.py <- Functions that enrich roofprint data with cool roof fields
     │
     └── tox.ini            <- tox file with settings for running tox; see tox.readthedocs.io
 
