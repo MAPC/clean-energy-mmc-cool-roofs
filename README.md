@@ -10,8 +10,6 @@ Project Organization
     ├── LICENSE
     ├── Makefile           <- Makefile with commands like `make data` or `make train`
     ├── README.md          <- The top-level README for developers using this project.
-    │
-    ├── docs               <- A default Sphinx project; see sphinx-doc.org for details
     │    
     ├── notebooks          <- Jupyter notebooks.
     │   ├── 01-running-cool-roof-process.ipynb    <- runs scripts for MMC communities
