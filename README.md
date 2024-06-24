@@ -30,8 +30,7 @@ Project Organization
     │   │
     │   ├── data           <- Scripts to download or generate data
     │   │   └── make_dataset.py  <-reads in data layers from MAPC's network drives
-    │   │   └── muni_uses.py     <- lists land uses that are associated with municipal ownership
-    │   │   └── public_uses.py   <- lists land uses that are associated with public ownership
+    │   │   └── public_uses.py   <- lists land uses that are associated with public and municipal ownership
     │   │
     │   ├── features       <- Scripts to turn raw data into features for modeling
     │   │   └── create_rasters.py   <- ArcPy-based functions for transforming Lidar into rasters

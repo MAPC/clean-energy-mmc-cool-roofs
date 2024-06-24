@@ -22,7 +22,29 @@ from src.data.make_dataset import cool_roofs_gdb, building_structures_fp, munis_
 
 def make_coolroof_roofprints_layer(town_name):
     '''
-    Rachel to fill in
+    takes in the slope and intensity rasters generated from lidar, runs zonal statistics to enrich footprint 
+    layers wtih information about slope and intensity.
+
+    A “low slope roof” for this analysis is defined as a rooftop where the majority of pixels 
+    within the roof's boundaries are less than or equal to a 17% rise. 
+
+    The intensity raster is rescaled to a 1-10 scale using percentile rankings, with pixels scoring a 
+    1 representing the 10% lowest (least reflective) rooftop intensity levels in the municipality, and 
+    pixels scoring a 10 representing the 10% highest (most reflective) rooftop intensity levels in the 
+    municipality. A “dark” roof for the final output tool is defined as a rooftop where the majority of pixels within 
+    the roof's boundaries rank in the top 50th percentile for intensity values.
+
+    Input: Town name (not town sensitive)
+
+    Output: roofprints layer with added key fields:
+    - 'MAJORITY':  slope "bucket" that the majority of raster cells across building fall into
+        - 1 = majority of raster cells fall under the lowest slope values (0 - 17% rise)
+        - 2 = 17-20% rise
+        - 3 = 20 -25% rise
+        - 4 = 25%+ rise 
+    - 'MAJORITY_P': the percent of raster cells that fall into that bucket 
+    - 'flat_roof': binary, determines whether a roof is "low-slope" (1) or not (0). 
+    - 'Int_Maj': the "majority" intensity value across the roofprint. Values are percentile ranks.
     '''
 
     env.overwriteOutput = True
@@ -71,13 +93,14 @@ def make_coolroof_roofprints_layer(town_name):
     #                    clip_features=munis_fp, 
     #                    out_feature_class=clipped_footprints)
 
-    #first reclassify slope pixels to integers, where the value of 1 represents lowest slope, etc
+    #first reclassify slope pixels to integers, where the value of 1 represents lowest slope, etc 
     slope_reclassified = Reclassify(in_raster=town_slope_raster, 
                             reclass_field="VALUE", 
                             remap="0 17 1; 17 20 2;20 25 3;25 10000 4",  
                             missing_values="NODATA")
 
     ## ZONAL STATISTICS AS TABLE ##
+    #creates a table of reclassified values. WE are most interested in the "MAJORITY" slope value
     with arcpy.EnvManager(snapRaster=town_slope_raster, 
                           #extent=town_boundary, 
                           cellSize=out_slope_raster):
@@ -90,7 +113,8 @@ def make_coolroof_roofprints_layer(town_name):
                         statistics_type="MAJORITY_VALUE_COUNT_PERCENT"
                         )
 
-    #ADD A FIRST PASS FLAT ROOF FIELD
+    ## ADD A FLAT ROOF FIELD  ##
+    # returns  a value of 1 if the majority of pixels are between 0-17% rise (MAJORITY=1)
     field_name = 'flat_roof'
     expression = "calc(!MAJORITY!)"
     code_block = """def calc(field1):
@@ -110,6 +134,7 @@ def make_coolroof_roofprints_layer(town_name):
         enforce_domains="NO_ENFORCE_DOMAINS"
         )
     
+    # join new field with footprints
     arcpy.management.JoinField(
                                 in_data=clipped_footprints,
                                 in_field='STRUCT_ID',
@@ -118,7 +143,7 @@ def make_coolroof_roofprints_layer(town_name):
                                 fields=['MAJORITY', 'MAJORITY_PERCENT', 'flat_roof']
                             )
   
-    
+    ## NOW INTENSITY ## 
     town_intensity_raster = ExtractByMask(intensity_raster, 
                                         town_boundary,
                                         "INSIDE")
@@ -141,9 +166,9 @@ def make_coolroof_roofprints_layer(town_name):
                             missing_values="NODATA"
                             )
 
-    #out_raster.save(r"K:\DataServices\Projects\Current_Projects\Climate_Change\MVP_MMC_CoolRoofs_MVP\ArcGIS\CoolRoofs_Analysis.gdb\reclassify_10_quantiles")
     
     ## ZONAL STATISTICS AS TABLE ##
+    #again, interested in majority
     with arcpy.EnvManager(snapRaster=intensity_reclassified, 
                         #extent=town_boundary, 
                         cellSize=intensity_reclassified):
@@ -158,9 +183,10 @@ def make_coolroof_roofprints_layer(town_name):
 
     arcpy.AlterField_management(in_table=zonal_stats_name, 
                                 field='MAJORITY', 
-                                new_field_alias='Int_Maj',
+                                new_field_alias='Int_Maj', #rename field 
                                 new_field_name='Int_Maj')
 
+    #join to footprints layer
                              
     arcpy.management.JoinField(
                                 in_data=clipped_footprints,
@@ -170,10 +196,9 @@ def make_coolroof_roofprints_layer(town_name):
                                 fields=['Int_Maj']
                             )
 
-
+    #delete intermediate steps 
     arcpy.Delete_management(zonal_histogram_name)
     arcpy.Delete_management(zonal_stats_name)
-    #arcpy.Delete_management(clipped_footprints)
     arcpy.Delete_management(zonal_stats_layer_name)
 
 def get_file(dir_name:str,
@@ -345,8 +370,8 @@ def get_landuse_data(muni):
 def get_heat_score_mmc(heat_index_fp):
 
     '''
-    For each census block  in the municipality, determines the relative heat index score compared to all other block groups. 
-    Parcels within those block groups can then be prioritized higher.
+    For each census block  in the municipality, determines the relative heat index score compared to all other 
+    block groups. Parcels within those block groups can then be prioritized higher.
 
     Inputs: Muni boundary (gdf), heat index raster (geotiff), comparitive geography
 
@@ -394,7 +419,18 @@ def get_muni_heat_score(mmc_blocks_heat,
                         town_name, 
                         muni_parcels):
     '''
-    describe
+    input: 
+    - mmc_blocks_heat = block level lst layer created through get_heat_score_mmc()
+    - town_name (not case sensitive)
+    - muni_parcels = parcels generated through get_landuse_Data()
+
+    output:
+    for each parcel, adds the following fields:
+    - 'lst_mean': mean land surface temp for census block that the parcel is within
+    - 'rnk_heat_m': the percentile ranking for the lst_mean of the parcel's associated census block 
+    (relative to rest of mmc)
+    - 'rnk_ht_muni': the percentile ranking for the lst_mean of the parcel's associated census block 
+    (relative to rest of the municipality)
     '''
    
 
@@ -423,7 +459,18 @@ def get_muni_heat_score(mmc_blocks_heat,
 
 def public_ownership(parcel_data, use_desc_field, owner_field):
     '''
-    description coming
+    looks at list of public and municipal ownership land uses/ ownership names
+    to determine whether a parcel is publicly and/or municipally owned
+
+    inputs:
+    - parcel_data
+    - use_desc_field: the field of the parcel data that is associated with land use description
+    - owner_field: the field of the input parcel data associated with ownership
+
+    output: fields added to parcel data
+    - 'pblc_use' : 1/0 whether the land use description falls into one of the "public" land use descriptions 
+    - 'pblc_owner': 1/0 whether the owner name falls into one of the "public" owner name prefixes
+    - 'muni_owner': 1/0 whether the owner name falls into one of the "muni" owner name prefixes
 
     '''
 
@@ -467,15 +514,21 @@ def cool_roof_process(town_name,
     
 
     '''
-    ## Rachel to fill in ## 
+    To the rooftops layer, adds fields for land use and socio-enviro characteristics, etc
     
-    
-
     INPUTS
-    - 
+    - town_name (not case sensitive)
+    - rooftops_layer: roof footprints to add fields to
+    - heat_blocks_layer: heat blocks generated from get_heat_score_mmc(), to apply to get_muni_heat_score() fxn
 
-    OUTPUTS 
-    - 
+    OUTPUTS - adds the following fields to the roofprints layer:
+    - 'heat_mmc': a descriptive field for whether or not roofprint is in a 
+                "high heat area" (80th percentile or higher) compared to rest of MMC
+    - 'heat_muni': a descriptive field for whether or not roofprint is in a 
+                "high heat area" (80th percentile or higher) compared to rest of muni
+    - 'EJ', 'EJ_CRITERIA_COUNT', 'EJ_CRIT_DESC': fields from MassGIS EJ Populations dataset
+    - select fields from MAPC Parcel database
+    - 'roof_sqm', 'roof_sqft' : rooftop size, in square meters and feet
 
     '''
     ## BRING IN PARCEL AND STRUCTURES DATA ##
